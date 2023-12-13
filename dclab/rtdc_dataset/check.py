@@ -1,6 +1,7 @@
 """Check RT-DC datasets for completeness"""
 import copy
 import functools
+from typing import Dict, List, Literal
 import warnings
 
 import h5py
@@ -12,6 +13,7 @@ from .fmt_hierarchy import RTDC_Hierarchy
 from .load import load_file
 
 from .. import definitions as dfn
+
 
 #: These sections should be fully present, except for the
 #: keys in :data:`OPTIONAL_KEYS`.
@@ -112,8 +114,15 @@ VALID_CHOICES = {}
 
 @functools.total_ordering
 class ICue(object):
-    def __init__(self, msg, level, category, data=None, identifier=None,
-                 cfg_section=None, cfg_key=None, cfg_choices=None):
+    def __init__(self,
+                 msg: str,
+                 level: Literal["violation", "alert", "info"],
+                 category: str,
+                 data: Dict = None,
+                 identifier: str = None,
+                 cfg_section: str = None,
+                 cfg_key: str = None,
+                 cfg_choices: List = None):
         """Integrity cue"""
         #: human-readable message
         self.msg = msg
@@ -139,7 +148,7 @@ class ICue(object):
                     and cfg_key in VALID_CHOICES[cfg_section]):
                 self.cfg_choices = VALID_CHOICES[cfg_section][cfg_key]
 
-    def __eq__(self, other):
+    def __eq__(self, other: 'ICue') -> bool:
         leveld = {"info": 0,
                   "violation": 1,
                   "alert": 2,
@@ -149,7 +158,7 @@ class ICue(object):
                 (leveld[other.level], other.cfg_section or "",
                  other.cfg_key or "", other.category, other.msg))
 
-    def __lt__(self, other):
+    def __lt__(self, other: 'ICue') -> bool:
         leveld = {"info": 0,
                   "violation": 1,
                   "alert": 2, }
@@ -158,11 +167,11 @@ class ICue(object):
                 (leveld[other.level], other.cfg_section or "",
                  other.cfg_key or "", other.category, other.msg))
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<ICue: '{self.msg}' at 0x{hex(id(self))}>"
 
     @staticmethod
-    def get_level_summary(cues):
+    def get_level_summary(cues: List['ICue']) -> Dict:
         """For a list of ICue, return the abundance of all levels"""
         levels = {"info": 0,
                   "alert": 0,
