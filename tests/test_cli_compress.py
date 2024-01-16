@@ -6,13 +6,49 @@ import sys
 import time
 
 import dclab
-from dclab import cli, new_dataset
-
+from dclab import cli, new_dataset, rtdc_dataset, RTDCWriter
 import h5py
 import numpy as np
 import pytest
 
 from helper_methods import retrieve_data
+
+
+def test_basin_preserved_compress():
+    h5path = retrieve_data("fmt-hdf5_fl_wide-channel_2023.zip")
+    h5path_small = h5path.with_name("smaller.rtdc")
+
+    # Dataset creation
+    with h5py.File(h5path) as src, RTDCWriter(h5path_small) as hw:
+        # first, copy all the scalar features to the new file
+        rtdc_dataset.rtdc_copy(src_h5file=src,
+                               dst_h5file=hw.h5file,
+                               features="scalar")
+        hw.store_basin(basin_name="example basin",
+                       basin_type="file",
+                       basin_format="hdf5",
+                       basin_locs=[h5path],
+                       basin_descr="an example test basin",
+                       )
+        h5path_out = h5path_small.with_name("compressed.rtdc")
+        cli.compress(path_in=h5path_small,
+                     path_out=h5path_out,
+                     )
+
+    with h5py.File(h5path_out) as h5_out, h5py.File(h5path_small) as h5_in:
+        # check if h5path_out is empty
+        if 'events' in h5_out:
+            assert len(h5_out['events']) == 0
+        # check if h5path_small basin is same as h5path_out basin
+        assert 'basins' in h5_in
+        assert 'basins' in h5_out
+        assert h5_in['basins'] == h5_out['basins']
+
+    with new_dataset(h5path) as ds, new_dataset(h5path_out) as ds_out:
+        # check if all features of h5path are preserved in h5path_out
+        assert len(ds.features) == 28
+        for feat in ds.features:
+            assert feat in ds_out.features_basin
 
 
 def test_check_suffix_disabled_compress():
@@ -182,3 +218,5 @@ def test_version(mock_stdout, monkeypatch):
     stdout_printed = mock_stdout.getvalue()
     assert stdout_printed.count("dclab-compress")
     assert stdout_printed.count(dclab.__version__)
+
+
